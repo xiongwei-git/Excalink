@@ -1,4 +1,6 @@
-# Excalink 宝塔部署
+# Excalink 宝塔生产部署记录
+
+通用部署步骤见 [中文指南](README.md) · [English guide](README.en.md)。
 
 ## 生产布局
 

@@ -83,3 +83,8 @@ last_reviewed: 2026-11-11
 - 按用户要求补齐 Docker/Node 部署、无账号/本地密码/OIDC 三种模式、密码哈希生成与重置、Tinyauth 客户端与 subject、通用 OIDC 兼容条件、反代/HTTPS、配置生效步骤及分享权限边界。
 - 对照当前 auth.js、server.js、Compose 与已安装 openid-client 核验变量、默认行为和 client_secret_post；README 密码生成示例在隔离实例中验证登录成功、匿名画布401，文档本地链接与 diff 检查通过。
 - 本次仅修改文档，不改变生产认证或重启线上服务；其他身份提供方未声明实测兼容。
+
+## 2026-11-11 双语项目首页与部署指南
+- 根 README 改为中英文项目介绍和 Docker 快速开始。通用部署、认证、反代、备份和 MCP 配置放在 docs/deployment/README.md 与 README.en.md。BAOTA.md 保留生产部署记录。
+- 用隔离实例与合成流程图拍摄画布、档案和分享三张实图。示例流程图通过 MCP 的 Mermaid 工具生成，分享链接已遮盖。
+- 中英文代码块一致，Shell 语法和本地链接通过检查。隔离 Docker Compose 构建、公开访问、密码哈希与登录、匿名 401、卷备份及 Node.js 环境文件启动均通过，9 项单元测试通过。本次未重验生产代理和 OIDC，未改动生产配置。
