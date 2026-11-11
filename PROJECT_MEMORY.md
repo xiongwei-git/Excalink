@@ -78,3 +78,8 @@ last_reviewed: 2026-11-11
 - 新增独立 Tinyauth OIDC 客户端，限制为现有唯一个人账号的 subject。变更前已备份认证 Compose，仅重建该认证容器；OIDC 发现接口及容器健康正常。凭据未写入仓库或输出。
 - 服务器 amd64 构建、非 root/回环监听、HTTPS/301、匿名401、合法 MCP读写、强制重建持久化及空白恢复通过。Nginx 语法通过，其他站点既有 protocol options 警告未改动。
 - 真实账号登录回跳、生产分享协作与证书自动续期覆盖新站点仍未验收。详情见 docs/deployment/BAOTA.md。
+
+## 2026-11-11 README 部署与认证指南
+- 按用户要求补齐 Docker/Node 部署、无账号/本地密码/OIDC 三种模式、密码哈希生成与重置、Tinyauth 客户端与 subject、通用 OIDC 兼容条件、反代/HTTPS、配置生效步骤及分享权限边界。
+- 对照当前 auth.js、server.js、Compose 与已安装 openid-client 核验变量、默认行为和 client_secret_post；README 密码生成示例在隔离实例中验证登录成功、匿名画布401，文档本地链接与 diff 检查通过。
+- 本次仅修改文档，不改变生产认证或重启线上服务；其他身份提供方未声明实测兼容。
