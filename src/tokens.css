@@ -1,0 +1,56 @@
+/* Hallmark · theme: Ink (by request) · ink: paper · scope: app · v2.0.0 */
+/* Project system: Chinese system type, semantic danger, neutral dark counterpart. */
+:root {
+  color-scheme: light;
+  --paper: #ffffff;
+  --surface: #f6f6f5;
+  --shell: #ededeb;
+  --ink: #202020;
+  --secondary: #595959;
+  --line: #858585;
+  --divider: #dededb;
+  --action: #202020;
+  --action-hover: #383838;
+  --on-action: #ffffff;
+  --accent: #176d67;
+  --accent-wash: #e5f3ef;
+  --feedback: #175f59;
+  --focus: #176d67;
+  --danger: #a12121;
+  --danger-wash: #fff0f0;
+  --clear: transparent;
+  --overlay: #15151559;
+  --shadow-float: 0 8px 28px #00000014, 0 1px 4px #0000000a;
+  --shadow-dialog: 0 20px 60px #00000024;
+  --family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --body: 400 1rem/1.7 var(--family);
+  --control: 500 .875rem/1.55 var(--family);
+  --title: 600 1.25rem/1.4 var(--family);
+  --page-title: 600 1.75rem/1.3 var(--family);
+  --radius-panel: .75rem;
+  --radius-control: .625rem;
+  --gutter: clamp(.75rem, 2vw, 1.5rem);
+}
+/* Existing dark-mode choice is preserved; this is a project extension of Ink. */
+.workspace:has(.canvas .excalidraw.theme--dark) {
+  color-scheme: dark;
+  --paper: #202020;
+  --surface: #2b2b2b;
+  --shell: #353535;
+  --ink: #f5f5f3;
+  --secondary: #bdbdb9;
+  --line: #888885;
+  --divider: #4a4a47;
+  --action: #f5f5f3;
+  --action-hover: #dededb;
+  --on-action: #202020;
+  --accent: #8dd4c6;
+  --accent-wash: #253e38;
+  --feedback: #a3dfd2;
+  --focus: #8dd4c6;
+  --danger: #ffb8b8;
+  --danger-wash: #482929;
+  --overlay: #00000080;
+  --shadow-float: 0 8px 28px #00000038, 0 1px 4px #00000024;
+  --shadow-dialog: 0 20px 60px #00000060;
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "date": "2026-11-11",
+    "mode": "redesign",
+    "depth": "full",
+    "scope": "app",
+    "theme": "ink",
+    "ink": "paper",
+    "shape": "app screen",
+    "genre": "editorial",
+    "signature": "full-window canvas",
+    "nav": "native canvas menu",
+    "imagery": "existing drawing illustration and user canvas",
+    "entry": "src/workspace.css",
+    "review": "subagent: one dark text inheritance defect fixed and verified",
+    "sweep": {
+      "fail": 0,
+      "reflex": 0,
+      "warn": [
+        "F7: shared app controls",
+        "F24: floating surfaces"
+      ]
+    },
+    "validation": "28 states, axe 0, native 200% zoom, 9 core tests"
+  }
+]

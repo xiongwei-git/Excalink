@@ -1,0 +1,21 @@
+{
+  "scanned": "2026-11-11",
+  "findings": {
+    "framework": "React 18 + Excalidraw 0.18.1, package.json",
+    "design": "docs/DESIGN.md and web-reading-v1",
+    "fonts": "system Chinese sans, no external fonts",
+    "scope": "app, all existing routes and overlays"
+  },
+  "preserve": [
+    "full-window canvas",
+    "all business handlers and routes",
+    "Chinese Type Scale",
+    "user content"
+  ],
+  "introduce": [
+    "Ink paper tokens",
+    "neutral dark extension",
+    "archive index and login composition"
+  ],
+  "working_tree": "preexisting untracked project; user authorized local edits; file backups kept"
+}

@@ -1,0 +1,10 @@
+**
+!package.json
+!package-lock.json
+!index.html
+!mcp-render.html
+!vite.config.js
+!src/
+!src/**
+!notices/
+!notices/**

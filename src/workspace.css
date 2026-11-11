@@ -1,0 +1,127 @@
+/* Hallmark · shape: app screen · genre: editorial · theme: Ink (by request) · redesign: full
+ * nav: native canvas menu · signature: full-window drawing surface · states: loading, empty, error, full · ink: paper
+ * axes: light/grotesk-sans/chromatic-teal · posture: restrained · v2.0.0 */
+/* Hallmark · pre-emit critique: canvas leads; archive is a ruled index; login is a quiet entry, not a marketing stage. */
+/* Hallmark · dropped arrow · removed decorative arrow icons, all actions and destinations preserved. */
+/* waive 22: Ink uses neutral black. Project baseline retains semantic danger and system Chinese type. */
+@import url('./tokens.css');
+@import url('./base.css');
+
+.icon { display: inline-block; flex: none; vertical-align: middle; }
+.brand { display: inline-flex; align-items: center; gap: .65rem; font: var(--title); }
+.brand-mark { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; color: var(--ink); }
+.brand-mark .icon { width: 2rem; height: 2rem; }
+.workspace { color: var(--ink); height: 100dvh; display: flex; flex-direction: column; }
+.work-surface { position: relative; flex: 1; display: flex; min-height: 0; min-width: 0; }
+.drawing-area { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.canvas { position: relative; flex: 1; min-width: 0; min-height: 0; }
+.canvas > .excalidraw { position: absolute; inset: 0; }
+
+/* One control family across the app's own surfaces. */
+:is(.problem, .library, .rename, .share-dialog, .login) :is(button, input, .sign-in-link) {
+  max-width: 100%; min-width: 0; min-height: 2.75rem; padding: .6rem .85rem;
+  border: 1px solid var(--line); border-radius: var(--radius-control);
+  background: var(--paper); color: var(--ink); font: var(--control);
+}
+:is(.problem, .library, .rename, .share-dialog, .login) :is(button, .sign-in-link) {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+:is(.problem, .library, .rename, .share-dialog, .login) button:enabled:hover { background: var(--surface); }
+:is(.problem, .library, .rename, .share-dialog, .login) button:enabled:active { background: var(--shell); }
+:is(.share-dialog, .login) :is(button.primary, .sign-in-link) { background: var(--action); color: var(--on-action); border-color: var(--action); }
+:is(.share-dialog, .login) :is(button.primary:enabled:hover, .sign-in-link:hover) { background: var(--action-hover); }
+:is(.problem, .library, .rename, .share-dialog, .login) button:disabled { background: var(--surface); border-color: var(--divider); color: var(--secondary); cursor: not-allowed; }
+input::placeholder { color: var(--secondary); opacity: 1; }
+.panel-heading, .dialog-actions, .problem-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; min-width: 0; }
+.panel-heading { justify-content: space-between; }
+.library h2, .share-dialog h2 { text-wrap: balance; margin: 0; font: var(--title); }
+:is(.library, .share-dialog) .icon-button { padding: .5rem; border-color: var(--clear); background: var(--clear); }
+a { text-underline-offset: .2em; }
+
+/* Small document caption: content remains the dominant object. */
+.board-overlay {
+  position: absolute; z-index: 3; inset: auto 3.75rem 1rem auto;
+  display: flex; flex-direction: column-reverse; align-items: end; gap: .6rem;
+  width: min(32rem, calc(100% - 17rem)); pointer-events: none;
+}
+.share-archive-link { color: var(--feedback); }
+.rename, .problem { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; padding: 1rem; line-height: 1.6; }
+.board-overlay > :is(.rename, .problem) { max-width: 100%; pointer-events: auto; border: 1px solid var(--divider); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
+.rename { background: var(--paper); }
+.rename input { flex: 1 1 12rem; }
+.problem { background: var(--danger-wash); color: var(--danger); }
+.problem a { color: var(--ink); }
+
+/* The archive is a compact index, with one row per document. */
+.drawing-area > .library {
+  position: absolute; z-index: 10; inset: 4.25rem auto auto 1rem;
+  width: min(23rem, calc(100% - 2rem)); max-height: calc(100% - 9rem);
+  display: flex; flex-direction: column; min-width: 0; overflow: auto;
+  padding: 1.25rem; border: 1px solid var(--divider); border-radius: var(--radius-panel);
+  background: var(--paper); box-shadow: var(--shadow-float); overflow-wrap: anywhere;
+}
+.archive-search { display: grid; gap: .4rem; margin: 1rem 0 .75rem; font: var(--control); }
+.archive-search input { width: 100%; background: var(--surface); }
+.archive-count { color: var(--secondary); font: var(--control); margin: 0 0 .75rem; }
+.library ul { padding: 0; margin: 0; list-style: none; overflow: auto; border-top: 1px solid var(--ink); }
+.library li + li { border-top: 1px solid var(--divider); }
+.library a { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; padding: 1rem .5rem; color: var(--ink); font: var(--control); text-decoration: none; }
+.library a .icon { margin-top: .1rem; color: var(--secondary); }
+.library a:hover { background: var(--surface); }
+.library a[aria-current="page"] { color: var(--feedback); background: var(--accent-wash); }
+.library a:focus-visible { outline-offset: -2px; }
+.empty-archive { margin: 1rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--ink); color: var(--secondary); }
+.library .logout { align-self: start; margin-top: 1rem; }
+
+/* Dialogs read from decision, through consequence, to action. */
+.share-dialog { width: min(32rem, calc(100% - 1.5rem)); max-height: calc(100dvh - 1.5rem); padding: 1.5rem; overflow: auto; border: 1px solid var(--divider); border-radius: var(--radius-panel); color: var(--ink); background: var(--paper); box-shadow: var(--shadow-dialog); }
+.share-dialog::backdrop { background: var(--overlay); }
+.share-dialog p { margin: 1rem 0; font: var(--body); }
+.share-dialog .sharing-policy { padding: .85rem 0 .85rem 1rem; border-inline-start: 2px solid var(--line); color: var(--secondary); }
+.share-field { display: grid; gap: .5rem; margin-top: 1.25rem; font: var(--control); }
+.share-dialog input { width: 100%; background: var(--surface); }
+.dialog-actions { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--divider); }
+.share-dialog .danger-button { color: var(--danger); border-color: var(--clear); background: var(--clear); }
+.share-dialog .danger-button:enabled:hover { background: var(--danger-wash); }
+.share-dialog .dialog-feedback { color: var(--feedback); }
+.share-dialog .dialog-error { color: var(--danger); }
+.share-archive-link { display: inline-block; margin-top: 1rem; font: var(--control); }
+
+/* A personal entry desk: identity and drawing on the left, sign-in on the right. */
+.login-page { width: min(56rem, calc(100% - 3rem)); min-height: 100dvh; margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr); align-content: center; gap: clamp(2rem, 7vw, 6rem); padding-block: 3rem; }
+.login-intro { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.login-intro h1 { margin: 2.5rem 0 .75rem; font: var(--page-title); }
+.login-intro p { margin: 0; color: var(--secondary); }
+.login-illustration { margin-top: 2rem; max-width: 18rem; color: var(--secondary); }
+.login-illustration svg { display: block; width: 100%; }
+.login { align-self: center; min-width: 0; padding-block: 2rem; border-block: 1px solid var(--ink); }
+.login form, .login label { display: grid; gap: .5rem; }
+.login label { font: var(--control); }
+.login form { gap: 1.5rem; }
+.login form > button { margin-top: .5rem; }
+.login .sign-in-link { width: 100%; }
+.login [role="alert"] { color: var(--danger); font: var(--body); margin: 1rem 0 0; }
+.loading, .standalone { width: min(36rem, calc(100% - 3rem)); margin: 15vh auto 2rem; }
+.loading p { color: var(--secondary); }
+.standalone { border-radius: var(--radius-panel); }
+
+@media (max-width: 37rem) {
+  .drawing-area > .library { inset-inline-start: .65rem; width: calc(100% - 1.3rem); padding: 1rem; }
+  .share-dialog { padding: 1.1rem; }
+  .login-page { grid-template-columns: minmax(0, 1fr); width: min(26rem, calc(100% - 2.5rem)); min-height: 100dvh; gap: 2rem; padding-block: 2rem; }
+  .login-intro h1 { margin-top: 1.75rem; }
+  .login-illustration { display: none; }
+  .login { padding-block: 1.5rem; }
+}
+.work-surface:has(.excalidraw--mobile) .board-overlay { inset-inline-end: .65rem; inset-block-end: 4.5rem; width: calc(100% - 1.3rem); }
+.work-surface:has(.sidebar) .board-overlay { inset-inline-end: 20rem; width: min(32rem, calc(100% - 37rem)); }
+.work-surface:has(.excalidraw--mobile .sidebar) .board-overlay { visibility: hidden; }
+/* User-requested integration exception: hide the library entry, including its focusable input. */
+.canvas .sidebar-trigger__label-element:has(.default-sidebar-trigger) { display: none; }
+
+/* Only an active operation occupies the lower corner; idle state has no chrome. */
+.board-loading { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: .5rem; color: var(--secondary); background: var(--surface); }
+.board-loading svg { animation: board-loading-turn .9s linear infinite; }
+@keyframes board-loading-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .board-loading svg { animation: none; } }
