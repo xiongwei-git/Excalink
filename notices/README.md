@@ -9,4 +9,4 @@ This inventory covers the locked production npm dependency tree, the fonts copie
 - The Docker base is the official Node Debian Bookworm slim image. OS package attribution is kept with the base distribution where present. Run `dpkg-query -W` in the built image to inventory its exact OS package versions.
 - Playwright, Chromium and Tinyauth are integration tooling. The project does not bundle the Tinyauth image or the browser binaries.
 
-Run `npm ci && npm run notices` after changing the npm lockfile. Build copies this directory to `dist/notices/`. This inventory does not select a license for PersonalWhiteboard source.
+Run `npm ci && npm run notices` after changing the npm lockfile. Build copies this directory to `dist/notices/`. Excalink’s own source code is covered by the [MIT License](../LICENSE).

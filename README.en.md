@@ -40,4 +40,4 @@ The [deployment guide](docs/deployment/README.en.md) covers Docker, Node.js, aut
 
 ## License
 
-A license for the project source is pending. See [third-party notices](notices/README.md) for Excalidraw, dependencies, and fonts.
+Excalink’s own source code is licensed under the [MIT License](LICENSE). Excalidraw, other third-party dependencies, and fonts are covered by their respective licenses. See the [third-party notices](notices/README.md) for details.

@@ -40,4 +40,4 @@ docker compose up -d --build
 
 ## 许可证
 
-项目源码许可证待定。[第三方归属与许可](notices/README.md)列出了 Excalidraw、相关依赖和字体的许可。
+Excalink 自有源码采用 [MIT 许可证](LICENSE)。Excalidraw、其他第三方依赖与字体适用各自的许可证，详见[第三方归属与许可](notices/README.md)。
