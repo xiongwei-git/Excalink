@@ -1,7 +1,7 @@
 # 项目进度
 home: macmini
 category: personal-service
-runtime: Node.js loopback preview
+runtime: external (Baota Docker); local loopback preview retained
 repository_model: single-repo
 source_of_truth: GitHub xiongwei-git/Excalink
 git_platform: github
@@ -71,3 +71,10 @@ last_reviewed: 2026-11-11
 - 项目源码许可证仍待选择，Liberation Sans 精确二进制许可待补证；此次不上传构建产物或字体二进制。
 
 - 本次 MCP 回归27个工具名称全部通过，含 Mermaid、PNG/SVG、视口和边界拒绝；修正验证脚本对已移除“已载入”文字的过时等待。Docker 持久化验证和9项核心测试通过。
+
+## 2026-11-11 宝塔生产部署
+- 用户明确授权部署至 excalink.tedxiong.com，其他部署细节自主处理。独立服务 /www/services/excalink，镜像 excalink:db63434，回环 14173，卷 excalink_whiteboard，未迁移或替换旧 whiteboard 服务。
+- 当前会话宝塔仅有只读工具；经 conn-hub 核验既有 SSH 后，使用宝塔原生操作函数完成反代创建、配置保存、证书部署与强制 HTTPS，面板元数据一致。浏览器面板登录不再需要用户处理。
+- 新增独立 Tinyauth OIDC 客户端，限制为现有唯一个人账号的 subject。变更前已备份认证 Compose，仅重建该认证容器；OIDC 发现接口及容器健康正常。凭据未写入仓库或输出。
+- 服务器 amd64 构建、非 root/回环监听、HTTPS/301、匿名401、合法 MCP读写、强制重建持久化及空白恢复通过。Nginx 语法通过，其他站点既有 protocol options 警告未改动。
+- 真实账号登录回跳、生产分享协作与证书自动续期覆盖新站点仍未验收。详情见 docs/deployment/BAOTA.md。
