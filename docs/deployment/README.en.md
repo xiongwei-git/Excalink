@@ -40,7 +40,7 @@ Choose one `AUTH_MODE` in `.env` and protect the credentials in that file.
 | `password` | One local username and password. |
 | `oidc` | One account authenticated by the identity provider with a matching `sub`. |
 
-In password and OIDC modes, guests with a share link can edit the corresponding board. Existing links remain valid after a password or authentication mode change until the owner revokes them.
+In password and OIDC modes, guests with a share link can edit the corresponding board. Existing links remain valid after a password or authentication mode change. The owner can revoke a link, and deleting its archived board also invalidates it. Shared copies created by earlier versions remain separate boards.
 
 ### Local password
 
@@ -129,11 +129,11 @@ curl -fsS https://board.example.com/auth/session
 curl -sS -o /dev/null -w '%{http_code}\n' https://board.example.com/api/current
 ```
 
-Expect `owner: false` and HTTP `401` in `password` or `oidc` mode, or `owner: true` and HTTP `200` in `public` mode. In a browser, verify that you can sign in, draw, refresh, and save a board to the archive. In a second browser, check that a shared copy can be edited and becomes inaccessible after you revoke its link.
+Expect `owner: false` and HTTP `401` in `password` or `oidc` mode, or `owner: true` and HTTP `200` in `public` mode. In a browser, verify that you can sign in, draw, refresh, and save a board to the archive. In a second browser, check that the current board syncs edits, its link follows it into the archive when you start a new board, and revoking the link blocks guest access.
 
 ## Updates and backups
 
-The `whiteboard` named volume stores canvases, archived boards, and images under `/data` in the container. Keep the Compose project name stable during updates. Stop the app and back up the entire volume. Record the current Git commit and keep a protected copy of `.env`.
+The `whiteboard` named volume stores canvases, archived boards, images, and MCP credential records under `/data` in the container. Keep the Compose project name stable during updates. Stop the app and back up the entire volume. Record the current Git commit and keep a protected copy of `.env`.
 
 ```sh
 docker compose stop whiteboard
@@ -165,6 +165,28 @@ Edit `.env` before starting the app if you need custom settings. The process bin
 
 ## Connect MCP
 
-Set a dedicated random `MCP_TOKEN` of at least 32 characters in the server's `.env`, then recreate the container or restart the Node.js app. On the machine running the MCP client, check out the same source version and run `npm ci`. Configure the client to launch `node /absolute/path/to/Excalink/src/mcp.js` over stdio. Set `MCP_BOARD_ORIGIN` to the server's external origin and use the same `MCP_TOKEN` in the client environment.
+Manage access in **MCP 服务** (MCP Service). Both transports require password or OIDC sign-in and an HTTPS `APP_ORIGIN`. For local use, a loopback HTTP origin is allowed. Remote HTTP supports OAuth or an API key. Local stdio uses a separate token.
 
-For Mermaid conversion and PNG or SVG export, run `npx playwright install chromium` on the MCP client machine or set `MCP_CHROME_CHANNEL=chrome` to use an installed Chrome. See the [MCP compatibility reference](../MCP_COMPATIBILITY.md) for the tool list.
+### Remote access (Streamable HTTP)
+
+Both remote authentication methods use `https://board.example.com/mcp`. Replace the hostname with yours. Preserve the Host, Authorization, MCP-Session-Id, and MCP-Protocol-Version request headers. The `location /` above forwards MCP and OAuth routes to Excalink. If your proxy routes by path, also forward `/.well-known/oauth-protected-resource/mcp`, `/.well-known/oauth-authorization-server`, `/authorize`, `/register`, `/token`, and the consent pages under `/mcp/`. Let discovery and token requests reach the app directly and let Excalink handle browser sign-in.
+
+#### OAuth sign-in
+
+Add the MCP URL in a client that supports OAuth discovery, dynamic registration, and PKCE S256. Follow the client prompt to sign in to Excalink in your browser, approve read-only or read/write access, and return to the client. Revoke the grant in **远程 HTTP → 安全授权** (Remote HTTP → Access). Grants last 90 days. Access tokens last one hour and can be renewed by clients that support refresh.
+
+#### API key
+
+In **远程 HTTP → 安全授权** (Remote HTTP → Access), issue a named API key with read-only or read/write access and a lifetime of 30, 90, or 365 days. Copy it when issued. Store it in the client’s credential settings and send it as `Authorization: Bearer <API Key>`. In the configuration example copied from the panel, `${EXCALINK_API_KEY}` is a placeholder. Use your client’s supported method to supply the credential. You can revoke the key in the same panel.
+
+For either remote authentication method, list the tools and call `describe_scene` to check the connection. Activity keeps the 200 most recent remote tool calls in memory until restart. OAuth grants and API key records are included in data directory backups. Mermaid conversion requires read/write access. PNG/SVG export and screenshots also accept read-only access.
+
+The Docker image includes Chromium. For a standalone Node.js deployment, run `node node_modules/playwright/cli.js install --with-deps --only-shell chromium` on Linux and ensure the service account can read the browser installation. On macOS, use `node node_modules/playwright/cli.js install --only-shell chromium` or set `MCP_CHROME_CHANNEL=chrome` in the service environment to use an installed Chrome.
+
+### Local access (stdio)
+
+Sign in and switch to **本地 stdio** (Local stdio) in the **MCP 服务** (MCP Service) sidebar. In **安全授权** (Access), issue a token with read-only or read/write access and an expiration date. It is ready to use immediately. Local stdio accepts one active token. To rotate it, revoke the old token, issue a new one, and update the client. When upgrading from an earlier version, replace the token from the old server-side `.env` setting with one issued in the app.
+
+On the machine running the MCP client, check out the same source version and run `npm ci`. Configure the client to launch `node /absolute/path/to/Excalink/src/mcp.js` over stdio. Set `MCP_BOARD_ORIGIN` to the whiteboard origin and set `MCP_TOKEN` to the issued token in the client environment. Call `describe_scene` and check the resulting board requests in the local stdio activity page. This log keeps its own 200 most recent server requests until restart.
+
+Stdio renders Mermaid conversions, PNG/SVG exports, and screenshots on the MCP client machine. Run `npx playwright install --only-shell chromium` there (add `--with-deps` on Linux), or set `MCP_CHROME_CHANNEL=chrome` to use installed Chrome. See the [MCP compatibility reference](../MCP_COMPATIBILITY.md) for the tool list.

@@ -3,11 +3,26 @@ import { createRoot } from 'react-dom/client';
 import { Excalidraw, MainMenu, serializeAsJSON } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import './workspace.css';
+import { McpSettings } from './mcp-settings.jsx';
+import { localeNames, preferredLocale, savedLocale, translator } from './locale.js';
 
 window.EXCALIDRAW_ASSET_PATH = '/assets/';
+const mcpLogin = /^[\w-]{43}$/.exec(new URLSearchParams(location.search).get('mcp_login') || '')?.[0];
 const boardId = /^\/boards\/([^/]+)$/.exec(location.pathname)?.[1];
 const shareToken = /^\/share\/([\w-]{43})$/.exec(location.pathname)?.[1];
 const savedBoard = Boolean(boardId || shareToken);
+const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+const shiftAlt = key => ({
+  code: 'Key' + key, shift: true, alt: true,
+  label: isMac ? `⌥⇧${key}` : `Alt ⇧ ${key}`, aria: 'Shift+Alt+' + key,
+});
+const saveShortcut = shift => ({
+  code: 'KeyS', mod: true, shift,
+  label: isMac ? (shift ? '⇧⌘S' : '⌘S') : (shift ? 'Ctrl ⇧ S' : 'Ctrl S'),
+  aria: [isMac ? 'Meta' : 'Control', ...(shift ? ['Shift'] : []), 'S'].join('+'),
+});
+const backgroundShortcut = shiftAlt('B');
+const themeShortcut = shiftAlt('D');
 const endpoint = shareToken ? `/api/share/${shareToken}` : boardId ? `/api/boards/${encodeURIComponent(boardId)}` : '/api/current';
 
 async function request(path, method = 'GET', data) {
@@ -15,7 +30,7 @@ async function request(path, method = 'GET', data) {
     method,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
     body: data ? JSON.stringify(data) : undefined,
-  });
+  }).catch(() => { throw new Error('暂时无法连接白板服务，请重试。'); });
   const value = await response.json().catch(() => null);
   if (!response.ok || !value) throw new Error(value?.error || '暂时无法连接白板服务，请重试。');
   return value;
@@ -31,55 +46,62 @@ function sceneJSON(elements, appState, files) {
 const icons = {
   archive: 'M3 8h18v12H3zM2 4h20v4H2zM9 12h6',
   board: 'M4 4h16v16H4zM8 15l3-5 3 3 2-4',
+  home: 'm3 10 9-7 9 7v10H3zM9 20v-6h6v6',
+  save: 'M4 4h13l3 3v13H4zM8 4v6h8V4M8 20v-6h8v6',
   copy: 'M8 8h12v12H8zM16 4H4v12',
   plus: 'M12 5v14M5 12h14',
   share: 'M12 15V3m-4 4 4-4 4 4M5 12v8h14v-8',
+  download: 'M12 3v12m-4-4 4 4 4-4M5 12v8h14v-8',
   close: 'm6 6 12 12M18 6 6 18',
   arrow: 'M5 12h14m-5-5 5 5-5 5',
+  mcp: 'M5 13h14M8 13v-3a4 4 0 0 1 8 0v3m-8 0v2a4 4 0 0 0 8 0v-2M10 4V2m4 2V2m-2 17v3',
+  language: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM2 12h20M12 2a16 16 0 0 1 0 20 16 16 0 0 1 0-20Z',
   link: 'M10 13a3 3 0 0 0 4 0l4-4a3 3 0 0 0-4-4l-2 2m2 4a3 3 0 0 0-4 0l-4 4a3 3 0 0 0 4 4l2-2',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5',
   edit: 'm5 16-1 4 4-1L19 8l-3-3zM14 7l3 3',
 };
-function Icon({ name }) {
-  return <svg className="icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+function Icon({ name, size = 18 }) {
+  return <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth={size === 16 ? 1.5 : 1.65} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d={icons[name]} />
   </svg>;
 }
-function Brand() {
-  return <div className="brand"><span className="brand-mark"><Icon name="board" /></span><span>个人白板</span></div>;
-}
-const archiveDate = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' });
-function displayName(name) {
-  if (!name) return '当前白板';
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(name) && !Number.isNaN(Date.parse(name))
-    ? archiveDate.format(new Date(name)) : name;
+function Brand({ t }) {
+  return <div className="brand"><span className="brand-mark"><Icon name="board" /></span><span>{t('个人白板')}</span></div>;
 }
 
 // Excalidraw 0.18.1 does not expose these labels through component props.
-function useCanvasAccessibility() {
+function useCanvasAccessibility(t) {
   const root = useRef(null);
   useEffect(() => {
     const canvas = root.current;
     function labelControls() {
       const menu = canvas.querySelector('.main-menu-trigger');
-      if (menu && !menu.hasAttribute('aria-label')) menu.setAttribute('aria-label', '白板菜单');
+      if (menu) menu.setAttribute('aria-label', t('白板菜单'));
       const labels = [
-        ['.sidebar-tab-trigger[id$="-trigger-search"]', '搜索素材'],
-        ['.sidebar-tab-trigger[id$="-trigger-library"]', '素材库'],
-        ['.library-menu-dropdown-container > .dropdown-menu-button', '素材库操作'],
+        ['.sidebar-tab-trigger[id$="-trigger-search"]', t('搜索素材')],
+        ['.sidebar-tab-trigger[id$="-trigger-library"]', t('素材库')],
+        ['.library-menu-dropdown-container > .dropdown-menu-button', t('素材库操作')],
       ];
       for (const [selector, label] of labels) {
         for (const control of canvas.querySelectorAll(selector)) {
-          if (!control.hasAttribute('aria-label')) control.setAttribute('aria-label', label);
+          control.setAttribute('aria-label', label);
         }
       }
       for (const picker of canvas.querySelectorAll('.color-picker-container[role="dialog"]')) {
-        if (!picker.hasAttribute('aria-label')) picker.setAttribute('aria-label', '颜色选择');
+        picker.setAttribute('aria-label', t('颜色选择'));
       }
+      const background = canvas.querySelector('.workspace-menu-background .properties-trigger');
+      if (background) background.setAttribute('aria-keyshortcuts', backgroundShortcut.aria);
       const theme = canvas.querySelector('[data-testid="toggle-dark-mode"]');
-      if (theme) theme.setAttribute('aria-label', theme.textContent.trim());
+      if (theme) {
+        theme.setAttribute('aria-keyshortcuts', themeShortcut.aria);
+        const hint = theme.querySelector('.dropdown-menu-item__shortcut');
+        if (hint && hint.textContent !== themeShortcut.label) hint.textContent = themeShortcut.label;
+        theme.setAttribute('aria-label', theme.textContent.trim());
+      }
       const zoom = canvas.querySelector('.reset-zoom-button');
-      if (zoom) zoom.setAttribute('aria-label', `${zoom.textContent.trim()}，重置缩放`);
+      if (zoom) zoom.setAttribute('aria-label', t('{zoom}，重置缩放', { zoom: zoom.textContent.trim() }));
       const footer = canvas.querySelector('footer');
       if (footer) footer.setAttribute('role', 'presentation');
     }
@@ -87,8 +109,8 @@ function useCanvasAccessibility() {
     observer.observe(canvas, { subtree: true, childList: true, characterData: true });
     function labelPortals() {
       const help = window.document.querySelector('.HelpDialog')?.closest('[role="dialog"]');
-      if (help && !help.hasAttribute('aria-label') && !window.document.getElementById(help.getAttribute('aria-labelledby') || '')) {
-        help.setAttribute('aria-label', '白板帮助');
+      if (help && !window.document.getElementById(help.getAttribute('aria-labelledby') || '')) {
+        help.setAttribute('aria-label', t('白板帮助'));
       }
       const tooltip = window.document.querySelector('.excalidraw-tooltip');
       if (tooltip && !tooltip.hasAttribute('role')) tooltip.setAttribute('role', 'tooltip');
@@ -98,11 +120,17 @@ function useCanvasAccessibility() {
     labelControls();
     labelPortals();
     return () => { observer.disconnect(); portals.disconnect(); };
-  }, []);
+  }, [t]);
   return root;
 }
 
-function Workspace({ initial, session }) {
+function Workspace({ initial, session, locale, t, changeLocale }) {
+  const archiveDate = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+  function displayName(name) {
+    if (!name) return t('当前白板');
+    return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(name) && !Number.isNaN(Date.parse(name))
+      ? archiveDate.format(new Date(name)) : name;
+  }
   const [document, setDocument] = useState(initial);
   const [status, setStatus] = useState('已载入');
   const [error, setError] = useState('');
@@ -112,11 +140,15 @@ function Workspace({ initial, session }) {
   const archiveSearch = useRef(null);
   const focusArchive = useRef(false);
   const newDialog = useRef(null);
-  const [renaming, setRenaming] = useState(false);
+  const [renaming, setRenaming] = useState(null);
+  const [renameError, setRenameError] = useState('');
   const renameInput = useRef(null);
+  const deleteDialog = useRef(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
   const [share, setShare] = useState(initial.share || '');
-  const [shareTarget, setShareTarget] = useState(boardId || null);
   const [shareMessage, setShareMessage] = useState('');
+  const [mcpOpen, setMcpOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [revoked, setRevoked] = useState(false);
   const [epoch, setEpoch] = useState(0);
@@ -124,11 +156,10 @@ function Workspace({ initial, session }) {
   const drawing = useRef(null);
   const connection = useRef(null);
   const selection = useRef('');
-  const canvas = useCanvasAccessibility();
+  const canvas = useCanvasAccessibility(t);
   const writing = useRef(false);
   const initialized = useRef(null);
   const remote = useRef(null);
-  const [name, setName] = useState(initial.name || '');
   const record = useRef(initial);
   const timer = useRef();
   const queue = useRef(Promise.resolve());
@@ -164,14 +195,12 @@ function Workspace({ initial, session }) {
     }
     remote.current = null;
     if (next.generation !== previous.generation) {
-      setShareTarget(null);
       setShare('');
     }
     record.current = next;
     const { elements, appState, files } = next.scene;
     baseline.current = latest.current = sceneJSON(elements, appState, files);
     setDocument(next);
-    setName(next.name || '');
     setEpoch(value => value + 1);
     setStatus('已同步');
   }
@@ -243,7 +272,7 @@ function Workspace({ initial, session }) {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     const link = window.document.createElement('a');
     link.href = url;
-    link.download = '白板草稿.excalidraw';
+    link.download = t('白板草稿.excalidraw');
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -337,7 +366,6 @@ function Workspace({ initial, session }) {
       baseline.current = latest.current = sceneJSON(elements, appState, files);
       setDocument(result.current);
       setStatus(result.archived ? '已归档旧白板' : '已新建白板');
-      setShareTarget(null);
       setShare('');
       newDialog.current.close();
       if (boards) setBoards(await request('/api/boards'));
@@ -347,12 +375,8 @@ function Workspace({ initial, session }) {
   function openShare() {
     setError('');
     setShareMessage('');
-    if (!boardId && !shareTarget) {
-      setShareOpen(true);
-      return;
-    }
     return action(async () => {
-      const result = await request(`/api/boards/${boardId || shareTarget}`);
+      const result = await request(endpoint);
       setShare(result.share || '');
       setShareOpen(true);
     });
@@ -360,17 +384,10 @@ function Workspace({ initial, session }) {
 
   async function toggleShare(enabled) {
     setShareMessage('');
-    const target = boardId || shareTarget;
-    if (!target) {
-      await persist();
-      const copy = await request('/api/current/share', 'POST', version());
-      setShareTarget(copy.id);
-      setShare(copy.share);
-      setShareMessage('副本已创建，可以复制编辑链接。');
-      if (boards) setBoards(await request('/api/boards'));
-      return;
-    }
-    const result = await request(`/api/boards/${target}/share`, 'PUT', { enabled });
+    if (!boardId) await persist();
+    const result = boardId
+      ? await request(`/api/boards/${boardId}/share`, 'PUT', { enabled })
+      : await request('/api/current/share', 'POST', { ...version(), enabled });
     setShare(result.share || '');
     setShareMessage(enabled ? '编辑链接已创建。' : '分享已撤销，原编辑链接已失效。');
   }
@@ -397,49 +414,163 @@ function Workspace({ initial, session }) {
   }
 
   function closeArchive() {
+    if (busy && renaming) return;
+    setRenaming(null);
+    setRenameError('');
     setBoards(null);
     focusBoardMenu();
   }
 
-  function closeRename() {
-    setRenaming(false);
-    focusBoardMenu();
+  function beginRename(board) {
+    if (busy) return;
+    setRenameError('');
+    setRenaming({ id: board.id, value: displayName(board.name) });
+  }
+
+  function renameOpenBoard() {
+    return action(async () => {
+      const entries = await request('/api/boards');
+      const board = entries.find(entry => entry.id === boardId);
+      if (!board) throw new Error('未找到此白板。');
+      setArchiveQuery('');
+      setBoards(entries);
+      setRenameError('');
+      setRenaming({ id: board.id, value: displayName(board.name) });
+    });
+  }
+
+  function closeRename(id) {
+    setRenaming(null);
+    setRenameError('');
+    requestAnimationFrame(() => {
+      (window.document.querySelector(`[data-archive-rename="${id}"]`) || archiveSearch.current)?.focus();
+    });
   }
 
   useEffect(() => {
-    if (renaming) renameInput.current?.select();
-  }, [renaming]);
+    if (renaming?.id) {
+      renameInput.current?.focus();
+      renameInput.current?.select();
+    }
+  }, [renaming?.id]);
 
-  const visibleBoards = boards?.toReversed().filter(board => displayName(board.name).toLowerCase().includes(archiveQuery.trim().toLowerCase()));
+  function saveArchiveName(board) {
+    const value = renaming.value.trim();
+    if (!value) {
+      setRenameError('请输入白板名称。');
+      return;
+    }
+    if (value === displayName(board.name)) return closeRename(board.id);
+    return action(async () => {
+      try {
+        if (board.id === boardId) await queue.current;
+        const revision = board.id === boardId ? record.current.revision : board.revision;
+        const updated = await request(`/api/boards/${board.id}`, 'PATCH', { revision, name: value });
+        setBoards(entries => entries.map(entry => entry.id === board.id ? { id: updated.id, name: updated.name, revision: updated.revision } : entry));
+        if (board.id === boardId) {
+          record.current = updated;
+          setDocument(updated);
+          setStatus('已重命名');
+        }
+        closeRename(board.id);
+      } catch (failure) {
+        setRenameError(failure.message);
+        requestAnimationFrame(() => renameInput.current?.focus());
+      }
+    });
+  }
+
+  function confirmArchiveDeletion(board) {
+    setDeleteTarget(board.id === boardId ? { ...board, revision: record.current.revision } : board);
+    setDeleteError('');
+    deleteDialog.current.showModal();
+  }
+
+  function deleteArchive() {
+    const board = deleteTarget;
+    return action(async () => {
+      try {
+        if (board.id === boardId) await queue.current;
+        await request(`/api/boards/${board.id}`, 'DELETE', { revision: board.revision });
+        if (board.id === boardId) {
+          clearTimeout(timer.current);
+          baseline.current = latest.current;
+          location.href = '/';
+          return;
+        }
+        setBoards(entries => entries.filter(entry => entry.id !== board.id));
+        deleteDialog.current.close();
+        requestAnimationFrame(() => (archiveSearch.current || window.document.querySelector('#archive-panel button'))?.focus());
+      } catch (failure) {
+        setDeleteError(failure.message);
+      }
+    });
+  }
+
+  const menuItems = [
+    session.owner && { label: t('白板档案'), icon: 'archive', shortcut: shiftAlt('O'), disabled: busy, run: openArchive },
+    savedBoard && session.owner && { label: t('返回当前白板'), icon: 'home', shortcut: shiftAlt('H'), run: () => { location.href = '/'; } },
+    savedBoard
+      ? { label: t('保存更改'), icon: 'save', shortcut: saveShortcut(false), disabled: busy || revoked, run: () => action(persist) }
+      : { label: t('新建白板'), icon: 'plus', shortcut: shiftAlt('N'), disabled: busy, run: () => {
+        setError('');
+        requestAnimationFrame(() => newDialog.current?.showModal());
+      } },
+    boardId && session.owner && { label: t('修改白板名称'), icon: 'edit',
+      shortcut: { code: 'F2', label: 'F2', aria: 'F2' }, disabled: busy, run: renameOpenBoard },
+    !savedBoard && { label: t('保存副本'), icon: 'copy', shortcut: saveShortcut(true), disabled: busy, run: saveCopy },
+    !shareToken && { label: boardId ? t('分享白板') : t('分享当前白板'), icon: 'share', shortcut: shiftAlt('S'), disabled: busy, run: openShare },
+    { label: t('导出文件'), icon: 'download', shortcut: shiftAlt('E'), run: exportDraft },
+  ].filter(Boolean);
+  const mcpItem = session.owner && !shareToken && {
+    label: t('MCP 服务'), icon: 'mcp', shortcut: shiftAlt('M'), run: () => setMcpOpen(true),
+  };
+  const backgroundItem = {
+    shortcut: backgroundShortcut, disabled: busy || revoked, keepMenuOpen: true,
+    run: () => drawing.current?.updateScene({ appState: { openMenu: 'canvas', openPopup: 'canvasBackground' } }),
+  };
+
+  useEffect(() => {
+    function handleShortcut(event) {
+      if (event.defaultPrevented || event.repeat || event.isComposing || renaming || drawing.current?.getAppState().editingTextElement ||
+          window.document.querySelector('dialog[open]') ||
+          event.target instanceof Element && (event.target.closest('input, textarea, select, [contenteditable], [aria-modal="true"]') ||
+          event.code === 'F2' && event.target.closest('#archive-panel'))) return;
+      const item = [...menuItems, mcpItem, backgroundItem].find(item => item && !item.disabled &&
+        event.code === item.shortcut.code && event.altKey === Boolean(item.shortcut.alt) &&
+        event.shiftKey === Boolean(item.shortcut.shift) &&
+        event.metaKey === Boolean(isMac && item.shortcut.mod) &&
+        event.ctrlKey === Boolean(!isMac && item.shortcut.mod));
+      if (!item) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!item.keepMenuOpen && drawing.current?.getAppState().openMenu === 'canvas') {
+        drawing.current.updateScene({ appState: { openMenu: null } });
+      }
+      item.run();
+    }
+    window.addEventListener('keydown', handleShortcut, true);
+    return () => window.removeEventListener('keydown', handleShortcut, true);
+  });
+
+  function renderMenuItem({ label, icon, shortcut, disabled, run }) {
+    return <MainMenu.Item key={icon} className="workspace-menu-item" icon={<Icon name={icon} size={16} />}
+      shortcut={shortcut.label} aria-keyshortcuts={shortcut.aria} disabled={disabled} onSelect={run}>{label}</MainMenu.Item>;
+  }
+
+  const visibleBoards = boards?.toReversed().filter(board => board.id === renaming?.id || displayName(board.name).toLowerCase().includes(archiveQuery.trim().toLowerCase()));
   return <main className="workspace" aria-label={displayName(document.name)} aria-busy={busy}>
     <div className="work-surface">
       <div className="board-overlay">
         {(busy || status === '正在保存') && !error && <div className="board-loading" role="status"
-          aria-label={busy ? '正在处理白板' : '正在保存白板'}>
+          aria-label={busy ? t('正在处理白板') : t('正在保存白板')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M20 12a8 8 0 1 1-8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </div>}
-      {renaming && <form className="rename" onKeyDown={event => {
-        if (event.key === 'Escape') { event.preventDefault(); if (!busy) closeRename(); }
-      }} onSubmit={event => {
-        event.preventDefault();
-        void action(async () => {
-          record.current = await request(endpoint, 'PATCH', { revision: record.current.revision, name });
-          setDocument(record.current);
-          setName(record.current.name);
-          setStatus('已重命名');
-          closeRename();
-        });
-      }}>
-        <input ref={renameInput} aria-label="白板名称" value={name} onChange={event => setName(event.target.value)}
-          required maxLength={200} disabled={busy} />
-        <button disabled={busy || !name.trim() || name.trim() === displayName(document.name)}>重命名</button>
-        <button type="button" disabled={busy} onClick={closeRename}>取消</button>
-      </form>}
-      {error && !shareOpen && !newDialog.current?.open && <div className="problem" role="alert"><span>{error}</span><div className="problem-actions">
-        <button onClick={exportDraft}>导出草稿</button>
-        {!revoked && <button disabled={busy} onClick={() => action(persist)}>重试保存</button>}
+      {error && !shareOpen && !newDialog.current?.open && <div className="problem" role="alert"><span>{t(error)}</span><div className="problem-actions">
+        <button onClick={exportDraft}>{t('导出草稿')}</button>
+        {!revoked && <button disabled={busy} onClick={() => action(persist)}>{t('重试保存')}</button>}
       </div></div>}
       </div>
       <div className="drawing-area">
@@ -447,106 +578,169 @@ function Workspace({ initial, session }) {
           if (event.key === 'Escape') { event.preventDefault(); closeArchive(); }
         }}>
           <div className="panel-heading">
-            <h2 id="files-heading">白板档案</h2>
-            <button className="icon-button" aria-label="关闭白板档案" onClick={closeArchive}><Icon name="close" /></button>
+            <h2 id="files-heading">{t('白板档案')}</h2>
+            <button className="icon-button" aria-label={t('关闭白板档案')} onClick={closeArchive}><Icon name="close" /></button>
           </div>
           {boards.length ? <>
-            <label className="archive-search">搜索档案
+            <label className="archive-search">{t('搜索档案')}
               <input ref={archiveSearch} value={archiveQuery} onChange={event => setArchiveQuery(event.target.value)} type="search" />
             </label>
-            <p className="archive-count" role="status">{archiveQuery ? `找到 ${visibleBoards.length} 份白板` : `${boards.length} 份白板`}</p>
-            {visibleBoards.length === 0 && <p className="empty-archive">没有找到匹配的白板。试试其他名称。</p>}
-            <ul>{visibleBoards.map(board => <li key={board.id}>
-              <a href={`/boards/${board.id}`} aria-current={board.id === boardId ? 'page' : undefined}>
-                <Icon name="board" /><span>{displayName(board.name)}</span>
-              </a>
+            <p className="archive-count" role="status">{archiveQuery ? t('找到 {count} 份白板', { count: visibleBoards.length }) : t('{count} 份白板', { count: boards.length })}</p>
+            {visibleBoards.length === 0 && <p className="empty-archive">{t('没有找到匹配的白板。试试其他名称。')}</p>}
+            <ul>{visibleBoards.map(board => <li key={board.id} onKeyDown={event => {
+              if (event.key === 'F2' && !renaming) {
+                event.preventDefault();
+                beginRename(board);
+              }
+            }}>
+              {renaming?.id === board.id ? <form className="archive-rename" onSubmit={event => {
+                event.preventDefault();
+                void saveArchiveName(board);
+              }} onKeyDown={event => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!busy) closeRename(board.id);
+                }
+              }}>
+                <input ref={renameInput} aria-label={t('白板名称')} aria-invalid={Boolean(renameError)}
+                  aria-describedby={renameError ? 'archive-rename-error' : undefined} value={renaming.value}
+                  onChange={event => { setRenameError(''); setRenaming({ ...renaming, value: event.target.value }); }}
+                  maxLength={200} readOnly={busy} />
+                {renameError && <p id="archive-rename-error" role="alert">{t(renameError)}</p>}
+              </form> : <div className="archive-row" data-current={board.id === boardId || undefined}>
+                <Icon name="board" />
+                <span className="archive-name" onDoubleClick={() => beginRename(board)}>{displayName(board.name)}</span>
+                <button type="button" className="icon-button" aria-label={t('重命名 {name}', { name: displayName(board.name) })}
+                  data-archive-rename={board.id} disabled={busy} onClick={() => beginRename(board)}>
+                  <Icon name="edit" />
+                </button>
+                <a className="archive-open" href={`/boards/${board.id}`} aria-current={board.id === boardId ? 'page' : undefined}
+                  aria-label={t('打开 {name}', { name: displayName(board.name) })} title={t('打开白板')}>
+                  <Icon name="arrow" />
+                </a>
+                <button type="button" className="icon-button archive-delete" aria-label={t('删除 {name}', { name: displayName(board.name) })}
+                  title={t('删除档案')} disabled={busy} onClick={() => confirmArchiveDeletion(board)}>
+                  <Icon name="trash" />
+                </button>
+              </div>}
             </li>)}</ul>
-          </> : <p className="empty-archive">还没有档案。保存副本或新建白板后，可以在这里打开之前的内容。</p>}
+          </> : <p className="empty-archive">{t('还没有档案。保存副本或新建白板后，可以在这里打开之前的内容。')}</p>}
           {session.mode !== 'public' && <button className="logout" onClick={() => action(async () => {
             if (latest.current !== baseline.current) await persist();
             await request('/auth/logout', 'POST');
             location.href = '/';
-          })}>退出登录</button>}
+          })}>{t('退出登录')}</button>}
         </aside>}
-        <section ref={canvas} className="canvas" aria-label="绘图画布">
+        <section ref={canvas} className="canvas" aria-label={t('绘图画布')}>
           <Excalidraw key={`${document.generation || document.id}:${epoch}`} initialData={{ ...document.scene, scrollToContent: true }}
-            excalidrawAPI={api => { drawing.current = api; }} langCode="zh-CN" onChange={change} viewModeEnabled={busy || revoked}
+            excalidrawAPI={api => { drawing.current = api; }} langCode={locale} onChange={change} viewModeEnabled={busy || revoked}
             UIOptions={{ canvasActions: { saveToActiveFile: false, loadScene: false, export: false } }}>
             <MainMenu>
-              {session.owner && <MainMenu.Item icon={<Icon name="archive" />} disabled={busy} onSelect={openArchive}>白板档案</MainMenu.Item>}
-              {savedBoard && session.owner && <MainMenu.Item onSelect={() => { location.href = '/'; }}>返回当前白板</MainMenu.Item>}
-              {savedBoard ? <>
-                <MainMenu.Item disabled={busy || revoked} onSelect={() => action(persist)}>保存更改</MainMenu.Item>
-                {boardId && <MainMenu.Item icon={<Icon name="edit" />} disabled={busy} onSelect={() => {
-                  setName(displayName(document.name));
-                  setRenaming(true);
-                }}>修改白板名称</MainMenu.Item>}
-              </> : <>
-                <MainMenu.Item icon={<Icon name="plus" />} disabled={busy} onSelect={() => {
-                  setError('');
-                  requestAnimationFrame(() => newDialog.current?.showModal());
-                }}>新建白板</MainMenu.Item>
-                <MainMenu.Item icon={<Icon name="copy" />} disabled={busy} onSelect={saveCopy}>保存副本</MainMenu.Item>
-              </>}
-              {!shareToken && <MainMenu.Item icon={<Icon name="share" />} disabled={busy} onSelect={openShare}>
-                {boardId ? '分享白板' : '分享副本'}
-              </MainMenu.Item>}
+              {menuItems.map(renderMenuItem)}
               <MainMenu.Separator />
-              <MainMenu.Item onSelect={exportDraft}>导出白板文件</MainMenu.Item>
+              {mcpItem && renderMenuItem(mcpItem)}
+              <MainMenu.Item icon={<Icon name="language" size={16} />} onSelect={() => changeLocale(otherLocale(locale))}
+                aria-label={t('切换语言') + ' · ' + localeNames[otherLocale(locale)]}>
+                {t('语言')} · <span lang={otherLocale(locale)}>{localeNames[otherLocale(locale)]}</span>
+              </MainMenu.Item>
               <MainMenu.DefaultItems.ToggleTheme />
-              <MainMenu.DefaultItems.ChangeCanvasBackground />
+              {!backgroundItem.disabled && <div className="workspace-menu-background">
+                <span aria-hidden="true">{backgroundShortcut.label}</span>
+                <MainMenu.DefaultItems.ChangeCanvasBackground />
+              </div>}
             </MainMenu>
           </Excalidraw>
         </section>
       </div>
 
     </div>
+    {mcpOpen && <McpSettings locale={locale} t={t} request={request} icon={name => <Icon name={name} />} onClose={() => {
+      setMcpOpen(false);
+      focusBoardMenu();
+    }} />}
+    <dialog ref={deleteDialog} className="share-dialog" aria-labelledby="delete-archive-heading"
+      onCancel={event => { if (busy) event.preventDefault(); }}
+      onClose={() => { setDeleteTarget(null); setDeleteError(''); }}>
+      <h2 id="delete-archive-heading">{t('删除档案')}</h2>
+      {deleteTarget && <>
+        <p className="archive-delete-description">{t('删除「{name}」后，无法在白板中恢复，已有分享链接也会失效。', { name: displayName(deleteTarget.name) })}</p>
+        {deleteTarget.id === boardId && latest.current !== baseline.current && <p>{t('此白板还有未保存的更改，删除后会一并丢弃。')}</p>}
+      </>}
+      {deleteError && <p className="dialog-error" role="alert">{t(deleteError)}</p>}
+      <div className="dialog-actions">
+        <button type="button" autoFocus disabled={busy} onClick={() => deleteDialog.current.close()}>{t('取消')}</button>
+        <button type="button" className="danger-button" disabled={busy || !deleteTarget} onClick={deleteArchive}>
+          {busy ? t('正在删除…') : t('确认删除')}
+        </button>
+      </div>
+    </dialog>
     <dialog ref={newDialog} className="share-dialog" aria-labelledby="new-heading"
       onCancel={event => { if (busy) event.preventDefault(); }}
       onClose={() => { setError(''); focusBoardMenu(); }}>
-      <h2 id="new-heading">新建白板</h2>
-      <p>有内容的当前白板会先保存到档案，然后打开空白画布。</p>
-      {error && <p className="dialog-error" role="alert">{error}</p>}
+      <h2 id="new-heading">{t('新建白板')}</h2>
+      <p>{t('有内容或正在共享的白板会先保存到档案，然后打开空白画布。原分享链接仍可访问归档白板。')}</p>
+      {error && <p className="dialog-error" role="alert">{t(error)}</p>}
       <div className="dialog-actions">
-        <button type="button" autoFocus disabled={busy} onClick={() => newDialog.current.close()}>取消</button>
-        <button type="button" className="primary" disabled={busy} onClick={newBoard}>{busy ? '正在新建…' : '确认新建'}</button>
+        <button type="button" autoFocus disabled={busy} onClick={() => newDialog.current.close()}>{t('取消')}</button>
+        <button type="button" className="primary" disabled={busy} onClick={newBoard}>{busy ? t('正在新建…') : t('确认新建')}</button>
       </div>
     </dialog>
     <dialog ref={dialog} className="share-dialog" onCancel={event => { if (busy) event.preventDefault(); }}
       onClose={() => { setShareOpen(false); setError(''); focusBoardMenu(); }}
       aria-labelledby="share-heading">
       <div className="panel-heading">
-        <h2 id="share-heading">{boardId ? '分享白板' : '分享副本'}</h2>
-        <button className="icon-button" aria-label="关闭" disabled={busy} onClick={() => setShareOpen(false)}><Icon name="close" /></button>
+        <h2 id="share-heading">{boardId ? t('分享白板') : t('分享当前白板')}</h2>
+        <button className="icon-button" aria-label={t('关闭')} disabled={busy} onClick={() => setShareOpen(false)}><Icon name="close" /></button>
       </div>
-      {!boardId && !shareTarget && <p>把当前内容保存为一张独立白板，供其他人共同编辑。你会留在当前画布。</p>}
-      {!boardId && shareTarget && <p>链接指向独立副本。当前画布和副本的编辑各自保存。</p>}
-      <p className="sharing-policy">{session.mode === 'public' ? '这是公开白板。撤销分享链接后，原白板地址仍可编辑。' : '有编辑链接的人可以共同编辑。撤销链接会断开访客的连接。'}</p>
+      {!boardId && <p>{t('访客通过链接与你编辑同一张白板。新建白板后，原链接仍指向归档里的这张白板。')}</p>}
+      <p className="sharing-policy">{session.mode === 'public' ? t('这是公开白板。撤销分享链接后，原白板地址仍可编辑。') : t('有编辑链接的人可以共同编辑。撤销链接会断开访客的连接。')}</p>
       {share ? <>
-        <label className="share-field">编辑链接
-          <input readOnly aria-label="分享链接" value={`${location.origin}/share/${share}`}
+        <label className="share-field">{t('编辑链接')}
+          <input readOnly aria-label={t('分享链接')} value={`${location.origin}/share/${share}`}
             onFocus={event => event.currentTarget.select()} />
         </label>
         <div className="dialog-actions">
           <button className="primary" disabled={busy} onClick={() => action(async () => {
-            await navigator.clipboard.writeText(`${location.origin}/share/${share}`);
+            try {
+              await navigator.clipboard.writeText(`${location.origin}/share/${share}`);
+            } catch {
+              throw new Error('无法写入剪贴板，请检查浏览器权限后重试。');
+            }
             setShareMessage('链接已复制。');
-          })}><Icon name="copy" />复制链接</button>
-          <button className="danger-button" disabled={busy} onClick={() => action(() => toggleShare(false))}>{busy ? '处理中…' : '撤销分享'}</button>
+          })}><Icon name="copy" />{t('复制链接')}</button>
+          <button className="danger-button" disabled={busy} onClick={() => action(() => toggleShare(false))}>{busy ? t('处理中…') : t('撤销分享')}</button>
         </div>
       </> : <div className="dialog-actions">
         <button className="primary" disabled={busy} onClick={() => action(() => toggleShare(true))}>
-          {busy ? '正在创建…' : shareTarget ? '创建编辑链接' : '创建共享副本'}
+          {busy ? t('正在创建…') : t('创建编辑链接')}
         </button>
       </div>}
-      {!boardId && shareTarget && <a className="share-archive-link" href={`/boards/${shareTarget}`}>打开共享副本</a>}
-      {shareMessage && <p className="dialog-feedback" role="status">{shareMessage}</p>}
-      {error && <p className="dialog-error" role="alert">{error}</p>}
+      {shareMessage && <p className="dialog-feedback" role="status">{t(shareMessage)}</p>}
+      {error && <p className="dialog-error" role="alert">{t(error)}</p>}
     </dialog>
   </main>;
 }
 
+const otherLocale = locale => locale === 'en' ? 'zh-CN' : 'en';
+
+function LanguageButton({ locale, changeLocale }) {
+  const next = otherLocale(locale);
+  return <button type="button" lang={next} onClick={() => changeLocale(next)}>{localeNames[next]}</button>;
+}
+
 function App() {
+  const [locale, setLocale] = useState(() => savedLocale(document.cookie) || preferredLocale(navigator.languages));
+  const t = React.useMemo(() => translator(locale), [locale]);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.title = t('个人白板') + ' · Excalink';
+  }, [locale, t]);
+  function changeLocale(next) {
+    document.cookie = `excalink_locale=${next}; Path=/; Max-Age=31536000; SameSite=Lax` +
+      (location.protocol === 'https:' ? '; Secure' : '');
+    setLocale(next);
+  }
   const [initial, setInitial] = useState(null);
   const [session, setSession] = useState(null);
   const [error, setError] = useState(new URLSearchParams(location.search).get('login') === 'failed' ? '登录未完成，请重试或联系管理员。' : '');
@@ -554,16 +748,20 @@ function App() {
   const signingIn = useRef(false);
   useEffect(() => {
     request('/auth/session').then(value => {
+      if (mcpLogin && value.owner && value.mode !== 'public') {
+        location.replace('/mcp/oauth/' + mcpLogin);
+        return;
+      }
       setSession(value);
       if (shareToken || value.owner) return request(endpoint).then(setInitial);
     }).catch(failure => setError(failure.message));
   }, []);
-  if (initial) return <Workspace initial={initial} session={session} />;
+  if (initial) return <Workspace initial={initial} session={session} locale={locale} t={t} changeLocale={changeLocale} />;
   if (session && !session.owner && !shareToken) return <main className="login-page">
     <div className="login-intro">
-      <Brand />
-      <h1 id="login-heading">打开你的白板</h1>
-      <p>登录后打开你的白板和档案。</p>
+      <Brand t={t} />
+      <h1 id="login-heading">{mcpLogin ? t('登录以连接白板') : t('打开你的白板')}</h1>
+      <p>{mcpLogin ? t('登录后确认客户端的访问权限。') : t('登录后打开你的白板和档案。')}</p>
     <div className="login-illustration" aria-hidden="true">
       <svg viewBox="0 0 420 300" fill="none">
         <path d="M110 100v104h101m-31-20 31 20-31 20M261 103h68v66" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -576,7 +774,8 @@ function App() {
     </div>
     </div>
     <section className="login" aria-labelledby="login-heading">
-      {session.mode === 'oidc' ? <a className="primary sign-in-link" href="/auth/oidc">使用身份服务登录</a> : <form onSubmit={async event => {
+      <div className="login-language"><LanguageButton locale={locale} changeLocale={changeLocale} /></div>
+      {session.mode === 'oidc' ? <a className="primary sign-in-link" href={'/auth/oidc' + (mcpLogin ? '?mcp_login=' + mcpLogin : '')}>{t('使用身份服务登录')}</a> : <form onSubmit={async event => {
         event.preventDefault();
         if (signingIn.current) return;
         signingIn.current = true;
@@ -593,14 +792,15 @@ function App() {
           setBusy(false);
         }
       }}>
-        <label>用户名<input name="username" required autoComplete="username" /></label>
-        <label>密码<input name="password" type="password" required autoComplete="current-password" /></label>
-        <button className="primary" disabled={busy}>{busy ? '正在登录…' : '登录'}</button>
+        <label>{t('用户名')}<input name="username" required autoComplete="username" /></label>
+        <label>{t('密码')}<input name="password" type="password" required autoComplete="current-password" /></label>
+        <button className="primary" disabled={busy}>{busy ? t('正在登录…') : t('登录')}</button>
       </form>}
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{t(error)}</p>}
   </section></main>;
-  if (error) return <main className="problem standalone" role="alert">{error} <a href="/">返回当前白板</a></main>;
-  return <main className="loading"><Brand /><p role="status">正在载入白板</p></main>;
+  if (error) return <main className="problem standalone"><p role="alert">{t(error)}</p> <a href="/">{t('返回当前白板')}</a>
+    <LanguageButton locale={locale} changeLocale={changeLocale} /></main>;
+  return <main className="loading"><Brand t={t} /><p role="status">{t('正在载入白板')}</p></main>;
 }
 
 createRoot(document.getElementById('root')).render(<App />);

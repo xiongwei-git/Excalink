@@ -43,7 +43,7 @@ try {
  await Promise.race([new Promise(r=>child.stdout.once('data',r)),new Promise((_,j)=>child.once('exit',c=>j(Error('app exit '+c))))]);
  browser=await chromium.launch({channel:'chrome'});
  for(const username of ['owner','guest']){
-  const context=await browser.newContext({ignoreHTTPSErrors:true});
+  const context=await browser.newContext({locale:'zh-CN',ignoreHTTPSErrors:true});
   const page=await context.newPage();page.setDefaultTimeout(8000);
   await page.goto(origin);
   await page.getByRole('link',{name:'使用身份服务登录'}).click();

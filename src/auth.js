@@ -76,7 +76,7 @@ export async function configureAuth(app, origin) {
     register(res);
     res.json({ owner: true });
   });
-  app.get('/auth/oidc', async (_req, res) => {
+  app.get('/auth/oidc', async (req, res) => {
     if (!provider) return res.sendStatus(404);
     const key = randomToken();
     const verifier = oidc.randomPKCECodeVerifier();
@@ -84,7 +84,9 @@ export async function configureAuth(app, origin) {
     const nonce = oidc.randomNonce();
     const age = 5 * 60 * 1000;
     if (pending.size >= 500) return res.sendStatus(429);
-    pending.set(key, { verifier, state, nonce, expires: Date.now() + age });
+    const login = req.query.mcp_login;
+    const mcpLogin = typeof login === 'string' && /^[\w-]{43}$/.test(login) ? login : '';
+    pending.set(key, { verifier, state, nonce, mcpLogin, expires: Date.now() + age });
     setCookie(res, pendingCookie, key, age);
     res.redirect(oidc.buildAuthorizationUrl(provider, {
       redirect_uri, scope: 'openid', state, nonce,
@@ -97,15 +99,16 @@ export async function configureAuth(app, origin) {
     pending.delete(key);
     setCookie(res, pendingCookie, '', 0);
     if (!provider || !flow || flow.expires < Date.now()) return res.redirect('/?login=failed');
+    const failed = '/?login=failed' + (flow.mcpLogin ? '&mcp_login=' + flow.mcpLogin : '');
     try {
       const tokens = await oidc.authorizationCodeGrant(provider, new URL(origin + req.originalUrl), {
         pkceCodeVerifier: flow.verifier, expectedState: flow.state, expectedNonce: flow.nonce,
       });
-      if (tokens.claims()?.sub !== process.env.OIDC_SUBJECT) return res.redirect('/?login=failed');
+      if (tokens.claims()?.sub !== process.env.OIDC_SUBJECT) return res.redirect(failed);
       register(res);
-      return res.redirect('/');
+      return res.redirect(flow.mcpLogin ? '/mcp/oauth/' + flow.mcpLogin : '/');
     } catch {
-      return res.redirect('/?login=failed');
+      return res.redirect(failed);
     }
   });
   app.post('/auth/logout', (req, res) => {

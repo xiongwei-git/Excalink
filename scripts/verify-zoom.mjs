@@ -21,7 +21,7 @@ try {
    new Promise((_,reject)=>service.once('exit',code=>reject(Error('preview exited '+code))))]);
  context=await chromium.launchPersistentContext(scratch+'/profile',{
   ...(process.env.PWB_CHROMIUM ? {executablePath:process.env.PWB_CHROMIUM} : {channel:'chromium'}),
-  args:['--disable-extensions-except='+ext,'--load-extension='+ext],viewport:{width:1280,height:900}
+  locale:'zh-CN',args:['--disable-extensions-except='+ext,'--load-extension='+ext],viewport:{width:1280,height:900}
  });
  const worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker',{timeout:8000});
  const page=await context.newPage();
@@ -41,16 +41,16 @@ try {
  const menu = page.getByRole('button', {name:'白板菜单'});
  await menu.focus();
  await page.keyboard.press('Enter');
- await page.getByRole('button',{name:'白板档案',exact:true}).press('Enter');
+ await page.getByRole('button',{name:/^白板档案/}).press('Enter');
  await page.getByRole('heading',{name:'白板档案'}).waitFor();
  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '关闭白板档案');
  await page.keyboard.press('Escape');
  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '白板菜单');
  await page.keyboard.press('Enter');
- await page.getByRole('button',{name:'分享副本',exact:true}).press('Enter');
+ await page.getByRole('button',{name:/^分享当前白板/}).press('Enter');
  const dialog=page.getByRole('dialog');
  await dialog.waitFor();
- await dialog.getByRole('button',{name:'创建共享副本'}).click();
+ await dialog.getByRole('button',{name:'创建编辑链接'}).click();
  await page.getByLabel('分享链接').waitFor();
  await page.screenshot({path:output+'/pwb-200-dialog.png',mask:[page.getByLabel('分享链接')]});
  const a=await new AxeBuilder({page}).analyze();

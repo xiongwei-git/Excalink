@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, scryptSync } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -8,8 +8,11 @@ import { chromium } from 'playwright';
 
 const origin='http://127.0.0.1:4199';
 const dataDir=await mkdtemp('/tmp/pwb-mcp-compat-');
-const env={...process.env, PORT:'4199', BOARD_DATA_DIR:dataDir,
- MCP_TOKEN:randomBytes(32).toString('base64url'), MCP_BOARD_ORIGIN:origin, MCP_CHROME_CHANNEL:'chrome'};
+const password=randomBytes(32).toString('base64url');
+const salt=randomBytes(16);
+const env={...process.env, PORT:'4199', APP_ORIGIN:origin, BOARD_DATA_DIR:dataDir,
+ AUTH_MODE:'password', AUTH_USERNAME:'compat-owner', PASSWORD_HASH:salt.toString('hex')+':'+scryptSync(password,salt,64).toString('hex'),
+ MCP_BOARD_ORIGIN:origin, MCP_CHROME_CHANNEL:'chrome'};
 const service=spawn(process.execPath,['src/server.js'],{env,stdio:['ignore','pipe','inherit']});
 const client=new Client({name:'compat-test',version:'1'});
 const tested=new Set();
@@ -24,7 +27,15 @@ const scene=async()=>JSON.parse((await call('query_elements')).text);
 const shape=(id,x,y)=>({id,type:'rectangle',x,y,width:100,height:60});
 try {
  await Promise.race([new Promise(r=>service.stdout.once('data',r)),new Promise((_,j)=>service.once('exit',c=>j(Error('server exit '+c))))]);
- await client.connect(new StdioClientTransport({command:process.execPath,args:['src/mcp.js'],env}));
+ const login=await fetch(origin+'/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({username:env.AUTH_USERNAME,password})});
+ assert.equal(login.status,200);
+ const cookie=login.headers.get('set-cookie').split(';')[0];
+ const issued=await fetch(origin+'/api/settings/mcp/keys',{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie},
+  body:JSON.stringify({name:'Compatibility test',transport:'stdio',scope:'write',days:30})});
+ assert.equal(issued.status,201);
+ const {token}=await issued.json();
+ await client.connect(new StdioClientTransport({command:process.execPath,args:['src/mcp.js'],env:{...env,MCP_TOKEN:token}}));
  const catalog=(await client.listTools()).tools;
  assert.equal(catalog.length,27);
  await call('create_element',{...shape('a',80,130),text:'First',strokeWidth:3,fontFamily:'sans'});
@@ -68,7 +79,10 @@ try {
  const svg=await call('export_to_image',{format:'svg',background:false,elementIds:['a']});
  assert.match(svg.text,/<svg/);
  browser=await chromium.launch({channel:'chrome'});
- const page=await browser.newPage();
+ const context=await browser.newContext();
+ const separator=cookie.indexOf('=');
+ await context.addCookies([{name:cookie.slice(0,separator),value:cookie.slice(separator+1),url:origin}]);
+ const page=await context.newPage();
  await page.goto(origin);
  await page.locator('.excalidraw__canvas.interactive').waitFor();
  await call('set_viewport',{zoom:1.5,offsetX:30,offsetY:20});
@@ -84,7 +98,7 @@ try {
  await call('clear_canvas',{confirm:true});
  state=await scene();
  assert.ok(state.scene.elements.every(e=>e.isDeleted));
- const response=await fetch(origin+'/api/current/new',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({generation:state.generation,revision:state.revision})});
+ const response=await fetch(origin+'/api/current/new',{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie},body:JSON.stringify({generation:state.generation,revision:state.revision})});
  assert.equal(response.status,200);
  await call('create_element',shape('stale',1,1),true);
  await call('restore_snapshot',{name:'checkpoint'},true);

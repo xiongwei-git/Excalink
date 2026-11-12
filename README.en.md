@@ -7,20 +7,24 @@ Excalink is a self-hosted personal whiteboard built on Excalidraw. Open the home
 ![Excalink canvas showing an editable flowchart generated from Mermaid via MCP](docs/images/canvas.png)
 
 - **Keep drawing** — The server saves the current canvas automatically so you can pick up after a refresh.
-- **Archive boards** — Save a copy at a stable URL, then find it in the searchable archive.
-- **Collaborate by link** — Share a separate copy of the current canvas. Guests can edit it together, and the owner can revoke the link.
-- **Connect AI tools** — MCP clients can read and edit the current canvas, convert Mermaid diagrams, and export PNG or SVG.
+- **Archive boards** — Save a copy at a stable URL, then find, open, rename, or delete it in the archive.
+- **Collaborate by link** — Guests edit the same board with you in real time. After you start a new board, the link still points to the archived board, and the owner can revoke it at any time.
+- **Connect AI tools** — Connect via remote Streamable HTTP or local stdio to read and edit the current canvas, convert Mermaid diagrams, and export PNG or SVG. Remote clients can sign in via browser OAuth or use an API key. Both transports support read-only access.
 
 <details>
-<summary>See the archive and sharing controls</summary>
+<summary>See the archive, sharing, and MCP screens</summary>
 
 **Board archive**
 
 ![Searchable list of archived whiteboards](docs/images/archive.png)
 
-**Share a copy**
+**Share the current board**
 
-![Edit link and revoke button for a shared copy, with the link redacted](docs/images/sharing.png)
+![Edit link and revoke button for a shared board, with the link redacted](docs/images/sharing.png)
+
+**MCP Service**
+
+![MCP Service panel showing separate OAuth and API key instructions for remote HTTP, with a local stdio option](docs/images/mcp.png)
 
 </details>
 

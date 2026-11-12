@@ -40,7 +40,9 @@ test('archive is a standalone scene and restores images and share metadata', asy
  const image = { id: 'image-1', type: 'image', fileId: 'file-1' };
  const files = { 'file-1': { id: 'file-1', mimeType: 'image/png', dataURL: 'data:image/png;base64,AA==' } };
  const current = await store.updateCurrent({ ...store.current(), scene: { elements: [image], appState: {}, files } });
- const archived = await store.shareCurrent(current);
+ const { board: shared } = await store.shareCurrent(current);
+ const { archived } = await store.newCurrent(current);
+ assert.equal(archived.share, shared.share);
  const manifest = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8'));
  const exported = JSON.parse(await readFile(join(dir, 'scenes', manifest.boards[archived.id].sceneFile), 'utf8'));
  assert.equal(exported.type, 'excalidraw');
@@ -48,7 +50,7 @@ test('archive is a standalone scene and restores images and share metadata', asy
  const reopened = await new BoardStore(dir).init();
  assert.deepEqual(reopened.byShare(archived.share).scene, current.scene);
  await reopened.shareBoard(archived.id, false);
- await assert.rejects(reopened.updateBoard(archived.id, { revision: archived.revision, scene }, archived.share), { status: 403 });
+ await assert.rejects(reopened.updateShared(archived.share, { revision: archived.revision, scene }), { status: 403 });
 });
 
 test('archive write failure leaves the current board intact', async () => {
@@ -59,4 +61,33 @@ test('archive write failure leaves the current board intact', async () => {
  assert.deepEqual(store.current(), current);
  assert.deepEqual((await new BoardStore(dir).init()).current(), current);
  assert.equal(store.list().length, 0);
+});
+
+test('sharing keeps one current board until it becomes an archive', async () => {
+ const { store } = await fixture();
+ const original = store.current();
+ const { board } = await store.shareCurrent(original);
+ assert.equal(store.list().length, 0);
+ assert.equal((await store.shareCurrent(original)).board.share, board.share);
+ const guest = await store.updateShared(board.share, { ...original, scene });
+ assert.equal(store.current().revision, guest.revision);
+ const copy = await store.saveCurrent(guest);
+ assert.equal(copy.share, undefined);
+ const { archived, current } = await store.newCurrent(guest);
+ assert.equal(archived.revision, guest.revision);
+ assert.equal(archived.generation, guest.generation);
+ assert.equal(current.share, undefined);
+ await store.updateShared(board.share, { ...guest, scene: { ...scene, elements: [] } });
+ assert.equal(store.board(archived.id).scene.elements.length, 0);
+ assert.deepEqual(store.current(), current);
+});
+
+test('new board preserves an empty shared board and revocation invalidates its old link', async () => {
+ const { store } = await fixture();
+ const original = store.current();
+ const { board } = await store.shareCurrent(original);
+ const { archived } = await store.newCurrent(original);
+ assert.equal(archived.share, board.share);
+ await store.shareBoard(archived.id, false);
+ assert.equal(store.byShare(board.share), undefined);
 });

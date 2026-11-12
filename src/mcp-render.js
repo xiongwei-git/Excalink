@@ -1,6 +1,10 @@
-export async function renderInBrowser(origin, payload) {
+import { join } from 'node:path';
+
+const renderPolicy = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: blob:; font-src 'self' data:; base-uri 'none'; form-action 'none'";
+
+export async function renderInBrowser(origin, payload, { assetRoot } = {}) {
   const { chromium } = await import('playwright').catch(() => {
-    throw new Error('本机渲染需要安装 Playwright 和 Chromium，见 README。');
+    throw new Error('画布渲染需要在运行 MCP 的机器上安装 Playwright 和 Chromium。');
   });
   const browser = await chromium.launch({
     ...(process.env.MCP_CHROME_CHANNEL ? { channel: process.env.MCP_CHROME_CHANNEL } : {}),
@@ -8,12 +12,24 @@ export async function renderInBrowser(origin, payload) {
   });
   try {
     const page = await browser.newPage({ serviceWorkers: 'block' });
-    await page.route('**/*', route => {
+    if (assetRoot) await page.routeWebSocket('**/*', socket => socket.close());
+    await page.route('**/*', async route => {
       const url = new URL(route.request().url());
-      if (url.origin === origin && (url.pathname === '/mcp-render.html' || url.pathname.startsWith('/assets/'))) {
-        return route.continue();
+      const renderer = url.pathname === '/mcp-render.html';
+      if (url.origin !== origin || (!renderer && !url.pathname.startsWith('/assets/'))) return route.abort();
+      if (!assetRoot) return route.continue();
+      // Remote rendering uses the built files directly and never contacts the whiteboard or an external origin.
+      if (!renderer && !/^\/assets\/(?:[\w-]+\/)*[\w.-]+\.(?:js|css|woff2)$/.test(url.pathname)) {
+        return route.abort();
       }
-      return route.abort();
+      try {
+        await route.fulfill({
+          path: join(assetRoot, url.pathname),
+          ...(renderer && { headers: { 'Content-Security-Policy': renderPolicy } }),
+        });
+      } catch {
+        await route.abort();
+      }
     });
     await page.goto(origin + '/mcp-render.html', { timeout: 10_000 });
     await page.waitForFunction(() => typeof window.whiteboardRender === 'function', null, { timeout: 10_000 });

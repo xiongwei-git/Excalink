@@ -113,41 +113,71 @@ export class BoardStore {
   newCurrent({ generation, revision }) {
     return this.#mutate(state => {
       if (state.current.generation !== generation || state.current.revision !== revision) throw new Conflict();
-      const archived = hasContent(state.current.scene) ? this.#archive(state) : null;
+      const previous = state.current;
+      const archived = previous.share || hasContent(previous.scene) ? this.#archive(state) : null;
+      if (previous.share) {
+        Object.assign(archived, { generation: previous.generation, revision: previous.revision, share: previous.share });
+      }
       state.current = { generation: randomUUID(), revision: 0, scene: empty() };
       return { archived, current: state.current };
     });
+  }
+  #setShare(board, enabled) {
+    const previous = board.share;
+    board.share = enabled ? previous || randomBytes(32).toString('base64url') : null;
+    return { board, previous };
   }
   shareBoard(id, enabled) {
     return this.#mutate(state => {
       const board = state.boards[id];
       if (!board) throw new Error('Not found');
-      board.share = enabled ? board.share || randomBytes(32).toString('base64url') : null;
-      return board;
+      return this.#setShare(board, enabled);
     });
   }
-  shareCurrent({ generation, revision }) {
+  shareCurrent({ generation, revision, enabled = true }) {
     return this.#mutate(state => {
       if (state.current.generation !== generation || state.current.revision !== revision) throw new Conflict();
-      const board = this.#archive(state);
-      board.share = randomBytes(32).toString('base64url');
+      return this.#setShare(state.current, enabled);
+    });
+  }
+  #findShared(state, token) {
+    if (!token) return;
+    if (state.current.share === token) return state.current;
+    return Object.values(state.boards).find(board => board.share === token);
+  }
+  hasShare(token) {
+    return Boolean(this.#findShared(this.state, token));
+  }
+  byShare(token) {
+    const board = this.#findShared(this.state, token);
+    return board && clone(board);
+  }
+  updateShared(token, { generation, revision, scene }) {
+    validate(scene);
+    return this.#mutate(state => {
+      const board = this.#findShared(state, token);
+      if (!board) throw Object.assign(new Error('Share revoked'), { status: 403 });
+      if (board.revision !== revision || (generation !== undefined && board.generation !== generation)) throw new Conflict();
+      board.scene = clone(scene);
+      board.revision++;
       return board;
     });
   }
-  hasShare(id, token) {
-    return this.state.boards[id]?.share === token;
+  deleteBoard(id, revision) {
+    return this.#mutate(state => {
+      const board = state.boards[id];
+      if (!board) throw Object.assign(new Error('Board not found'), { status: 404 });
+      if (board.revision !== revision) throw new Conflict();
+      delete state.boards[id];
+      return board;
+    });
   }
-  byShare(token) {
-    const board = Object.values(this.state.boards).find(item => item.share === token);
-    return board && clone(board);
-  }
-  updateBoard(id, { revision, scene, name }, shareToken) {
+  updateBoard(id, { revision, scene, name }) {
     if (scene !== undefined) validate(scene);
     if (name !== undefined && (typeof name !== 'string' || !name.trim() || name.length > 200)) throw new Error('Invalid name');
     return this.#mutate(state => {
       const board = state.boards[id];
       if (!board) throw new Error('Not found');
-      if (shareToken && board.share !== shareToken) throw Object.assign(new Error('Share revoked'), { status: 403 });
       if (board.revision !== revision) throw new Conflict();
       if (scene !== undefined) board.scene = clone(scene);
       if (name !== undefined) board.name = name.trim();

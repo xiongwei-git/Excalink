@@ -2681,6 +2681,28 @@
       ]
     },
     {
+      "name": "playwright",
+      "version": "1.65.0",
+      "license": "Apache-2.0",
+      "path": "node_modules/playwright",
+      "installed": true,
+      "notices": [
+        "LICENSE",
+        "NOTICE"
+      ]
+    },
+    {
+      "name": "playwright-core",
+      "version": "1.65.0",
+      "license": "Apache-2.0",
+      "path": "node_modules/playwright-core",
+      "installed": true,
+      "notices": [
+        "LICENSE",
+        "NOTICE"
+      ]
+    },
+    {
       "name": "png-chunk-text",
       "version": "1.0.0",
       "license": "MIT",

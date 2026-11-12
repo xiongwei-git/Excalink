@@ -15,7 +15,6 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_SUBJECT: ${OIDC_SUBJECT:-}
-      MCP_TOKEN: ${MCP_TOKEN:-}
     volumes:
       - whiteboard:/data
 volumes:

@@ -40,7 +40,7 @@ docker compose logs --tail=100 whiteboard
 | `password` | 一个本地用户名与密码。 |
 | `oidc` | 由身份提供方认证且 `sub` 匹配的一个账号。 |
 
-密码和 OIDC 模式下，持分享链接的访客可以编辑对应白板。更换密码或认证方式后，已有分享链接继续有效，直到所有者撤销链接。
+密码和 OIDC 模式下，持分享链接的访客可以编辑对应白板。更换密码或认证方式后，已有分享链接继续有效。所有者可撤销链接，删除对应档案也会使链接失效。早期版本生成的共享副本仍是独立白板。
 
 ### 本地密码
 
@@ -129,11 +129,11 @@ curl -fsS https://board.example.com/auth/session
 curl -sS -o /dev/null -w '%{http_code}\n' https://board.example.com/api/current
 ```
 
-`password` / `oidc` 预期得到 `owner: false` 和 HTTP `401`，`public` 预期得到 `owner: true` 和 HTTP `200`。随后用浏览器完成登录、绘图后刷新、保存档案，并用另一浏览器验证共享副本可以编辑且撤销后无法继续访问。
+`password` / `oidc` 预期得到 `owner: false` 和 HTTP `401`，`public` 预期得到 `owner: true` 和 HTTP `200`。随后用浏览器完成登录、绘图后刷新、保存档案，并用另一浏览器验证当前白板可以双向编辑、旧链接在新建后仍访问归档白板，以及撤销后访客无法继续访问。
 
 ## 更新与备份
 
-画布、档案和图片保存在 `whiteboard` 命名卷中，挂载到容器的 `/data`。更新时保持同一 Compose 项目名。以下命令暂停应用并备份整个卷，然后拉取更新并重建。建议同时保留更新前的提交号和受保护的 `.env` 副本。
+画布、档案、图片和 MCP 凭据记录保存在 `whiteboard` 命名卷中，挂载到容器的 `/data`。更新时保持同一 Compose 项目名。以下命令暂停应用并备份整个卷，然后拉取更新并重建。建议同时保留更新前的提交号和受保护的 `.env` 副本。
 
 ```sh
 docker compose stop whiteboard
@@ -165,6 +165,28 @@ node --env-file=.env src/server.js
 
 ## 连接 MCP
 
-在服务端 `.env` 设置独立随机 `MCP_TOKEN`（至少 32 字符），然后重建容器或重启 Node.js 应用。在运行 MCP 客户端的机器上检出同版本源码并运行 `npm ci`。将客户端的 stdio 启动命令设为 `node /absolute/path/to/Excalink/src/mcp.js`，在客户端环境中设置 `MCP_BOARD_ORIGIN` 为服务访问源地址，并配置相同的 `MCP_TOKEN`。
+在「MCP 服务」里管理接入。两种传输方式都需要密码或 OIDC 登录，以及 HTTPS 的 `APP_ORIGIN`。本机可使用 HTTP 回环地址。远程 HTTP 支持 OAuth 或 API Key，本地 stdio 使用独立令牌。
 
-Mermaid 转换和 PNG/SVG 导出还需在 MCP 客户端机器运行 `npx playwright install chromium`，或设置 `MCP_CHROME_CHANNEL=chrome` 使用已安装的 Chrome。工具范围见 [MCP 兼容表](../MCP_COMPATIBILITY.md)。
+### 远程接入（Streamable HTTP）
+
+客户端统一连接 `https://board.example.com/mcp`，请替换为你的白板地址。反向代理应保留 Host、Authorization、MCP-Session-Id 和 MCP-Protocol-Version 请求头。上文的 `location /` 会将 MCP 与 OAuth 路由转发给 Excalink。如果代理按路径选择上游，也要转发 `/.well-known/oauth-protected-resource/mcp`、`/.well-known/oauth-authorization-server`、`/authorize`、`/register`、`/token` 及 `/mcp/` 下的授权页面。发现和令牌请求应直接到达应用，浏览器登录由 Excalink 处理。
+
+#### OAuth 登录
+
+在支持 OAuth 发现、动态注册和 PKCE S256 的客户端中添加上面的 MCP 地址。连接后按客户端提示在浏览器登录 Excalink，确认只读或读写权限，再返回客户端。可在「远程 HTTP → 安全授权」撤销授权。OAuth 授权有效期为 90 天，访问令牌有效期为 1 小时，由支持刷新流程的客户端续期。
+
+#### API Key
+
+在「远程 HTTP → 安全授权」创建命名 API Key，选择只读或读写，以及 30、90 或 365 天有效期。Key 仅在签发时显示。将它填入客户端的凭据设置，以 `Authorization: Bearer <API Key>` 发送。面板复制的配置示例中，`${EXCALINK_API_KEY}` 是占位符，按客户端支持的方式配置实际凭据。可在同一面板撤销 Key。
+
+两种远程认证方式都可通过列出工具并调用 `describe_scene` 检查连接。任务记录在内存中保留最近 200 条远程工具调用，重启后清空。OAuth 授权与 API Key 的记录随数据目录备份。Mermaid 转换需要读写权限，PNG/SVG 导出与截图支持只读权限。
+
+Docker 镜像自带 Chromium。直接用 Node.js 部署时，在白板服务所在机器运行 `node node_modules/playwright/cli.js install --with-deps --only-shell chromium`（Linux），并确保服务账号能读取安装目录。macOS 可使用 `node node_modules/playwright/cli.js install --only-shell chromium`，或在服务进程中设置 `MCP_CHROME_CHANNEL=chrome` 使用已安装的 Chrome。
+
+### 本地接入（stdio）
+
+登录白板，在「MCP 服务」左侧切换到「本地 stdio」，然后打开「安全授权」生成独立访问令牌。选择只读或读写和有效期，复制令牌后即可使用。本地 stdio 同时只允许一个有效令牌。轮换时先撤销旧令牌，再签发新令牌并更新客户端。由旧版本升级时，原服务端 `.env` 中的 `MCP_TOKEN` 已失效，客户端需换成页面签发的令牌。
+
+在运行 MCP 客户端的机器上检出同版本源码并运行 `npm ci`。将 stdio 启动命令设为 `node /absolute/path/to/Excalink/src/mcp.js`，设置客户端环境变量 `MCP_BOARD_ORIGIN` 为白板根地址、`MCP_TOKEN` 为刚生成的令牌。调用 `describe_scene` 后，可以在「本地 stdio → 任务记录」查看白板服务收到的请求。这里独立保留最近 200 条服务端请求，重启后清空。
+
+Mermaid 转换、PNG/SVG 导出和截图在 stdio 客户端机器渲染。在该机器运行 `npx playwright install --only-shell chromium`（Linux 加 `--with-deps`），或设置 `MCP_CHROME_CHANNEL=chrome` 使用已安装的 Chrome。工具范围见 [MCP 兼容表](../MCP_COMPATIBILITY.zh-CN.md)。

@@ -18,20 +18,20 @@
 .canvas > .excalidraw { position: absolute; inset: 0; }
 
 /* One control family across the app's own surfaces. */
-:is(.problem, .library, .rename, .share-dialog, .login) :is(button, input, .sign-in-link) {
+:is(.problem, .library, .share-dialog, .login) :is(button, input, .sign-in-link) {
   max-width: 100%; min-width: 0; min-height: 2.75rem; padding: .6rem .85rem;
   border: 1px solid var(--line); border-radius: var(--radius-control);
   background: var(--paper); color: var(--ink); font: var(--control);
 }
-:is(.problem, .library, .rename, .share-dialog, .login) :is(button, .sign-in-link) {
+:is(.problem, .library, .share-dialog, .login) :is(button, .sign-in-link) {
   display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
   cursor: pointer; text-decoration: none; white-space: nowrap;
 }
-:is(.problem, .library, .rename, .share-dialog, .login) button:enabled:hover { background: var(--surface); }
-:is(.problem, .library, .rename, .share-dialog, .login) button:enabled:active { background: var(--shell); }
+:is(.problem, .library, .share-dialog, .login) button:enabled:hover { background: var(--surface); }
+:is(.problem, .library, .share-dialog, .login) button:enabled:active { background: var(--shell); }
 :is(.share-dialog, .login) :is(button.primary, .sign-in-link) { background: var(--action); color: var(--on-action); border-color: var(--action); }
 :is(.share-dialog, .login) :is(button.primary:enabled:hover, .sign-in-link:hover) { background: var(--action-hover); }
-:is(.problem, .library, .rename, .share-dialog, .login) button:disabled { background: var(--surface); border-color: var(--divider); color: var(--secondary); cursor: not-allowed; }
+:is(.problem, .library, .share-dialog, .login) button:disabled { background: var(--surface); border-color: var(--divider); color: var(--secondary); cursor: not-allowed; }
 input::placeholder { color: var(--secondary); opacity: 1; }
 .panel-heading, .dialog-actions, .problem-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; min-width: 0; }
 .panel-heading { justify-content: space-between; }
@@ -45,11 +45,8 @@ a { text-underline-offset: .2em; }
   display: flex; flex-direction: column-reverse; align-items: end; gap: .6rem;
   width: min(32rem, calc(100% - 17rem)); pointer-events: none;
 }
-.share-archive-link { color: var(--feedback); }
-.rename, .problem { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; padding: 1rem; line-height: 1.6; }
-.board-overlay > :is(.rename, .problem) { max-width: 100%; pointer-events: auto; border: 1px solid var(--divider); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
-.rename { background: var(--paper); }
-.rename input { flex: 1 1 12rem; }
+.problem { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; padding: 1rem; line-height: 1.6; }
+.board-overlay > .problem { max-width: 100%; pointer-events: auto; border: 1px solid var(--divider); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
 .problem { background: var(--danger-wash); color: var(--danger); }
 .problem a { color: var(--ink); }
 
@@ -66,11 +63,33 @@ a { text-underline-offset: .2em; }
 .archive-count { color: var(--secondary); font: var(--control); margin: 0 0 .75rem; }
 .library ul { padding: 0; margin: 0; list-style: none; overflow: auto; border-top: 1px solid var(--ink); }
 .library li + li { border-top: 1px solid var(--divider); }
-.library a { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; padding: 1rem .5rem; color: var(--ink); font: var(--control); text-decoration: none; }
-.library a .icon { margin-top: .1rem; color: var(--secondary); }
-.library a:hover { background: var(--surface); }
-.library a[aria-current="page"] { color: var(--feedback); background: var(--accent-wash); }
-.library a:focus-visible { outline-offset: -2px; }
+.archive-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) repeat(3, auto);
+  align-items: center;
+  gap: .25rem;
+  padding: .25rem;
+  color: var(--ink);
+  font: var(--control);
+}
+.archive-row[data-current] { color: var(--feedback); background: var(--accent-wash); }
+.archive-name { padding: .5rem .25rem; cursor: text; overflow-wrap: anywhere; }
+.archive-row > .icon { margin-inline-start: .25rem; color: var(--secondary); }
+.archive-row .archive-open {
+  display: grid;
+  place-items: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  color: var(--ink);
+  border-radius: var(--radius-control);
+}
+.archive-row .archive-open:hover { background: var(--surface); }
+.archive-row .archive-delete { color: var(--danger); }
+.archive-delete-description { overflow-wrap: anywhere; }
+.archive-row .archive-open:focus-visible { outline-offset: -2px; }
+.archive-rename { padding: .25rem; }
+.archive-rename input { width: 100%; }
+.archive-rename p { margin: .5rem 0 0; color: var(--danger); font: var(--body); }
 .empty-archive { margin: 1rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--ink); color: var(--secondary); }
 .library .logout { align-self: start; margin-top: 1rem; }
 
@@ -86,7 +105,6 @@ a { text-underline-offset: .2em; }
 .share-dialog .danger-button:enabled:hover { background: var(--danger-wash); }
 .share-dialog .dialog-feedback { color: var(--feedback); }
 .share-dialog .dialog-error { color: var(--danger); }
-.share-archive-link { display: inline-block; margin-top: 1rem; font: var(--control); }
 
 /* A personal entry desk: identity and drawing on the left, sign-in on the right. */
 .login-page { width: min(56rem, calc(100% - 3rem)); min-height: 100dvh; margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr); align-content: center; gap: clamp(2rem, 7vw, 6rem); padding-block: 3rem; }
@@ -125,3 +143,23 @@ a { text-underline-offset: .2em; }
 .board-loading svg { animation: board-loading-turn .9s linear infinite; }
 @keyframes board-loading-turn { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .board-loading svg { animation: none; } }
+
+.excalidraw .dropdown-menu :is(.workspace-menu-item, [data-testid="toggle-dark-mode"]) .dropdown-menu-item__shortcut,
+.workspace-menu-background > span {
+  font: var(--control);
+  font-weight: 400;
+  color: color-mix(in srgb, var(--color-on-surface) 72%, var(--island-bg-color));
+  opacity: 1;
+}
+.workspace-menu-background { position: relative; }
+.workspace-menu-background > span {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: .625rem;
+  pointer-events: none;
+}
+@media (max-width: 42rem) {
+  .workspace-menu-background > span { display: none; }
+}
+
+.login-language { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
